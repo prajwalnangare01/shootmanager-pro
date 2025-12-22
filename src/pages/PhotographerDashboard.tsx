@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Shoot } from '@/types/database';
@@ -10,16 +11,48 @@ import { Camera, Calendar, Briefcase, LogOut, Loader2 } from 'lucide-react';
 type ViewType = 'shoots' | 'availability';
 
 export default function PhotographerDashboard() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState<ViewType>('shoots');
   const [shoots, setShoots] = useState<Shoot[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      fetchShoots();
+    if (!authLoading) {
+      if (!user) {
+        navigate('/auth');
+      } else if (profile && profile.role !== 'photographer') {
+        navigate('/admin');
+      }
     }
-  }, [user]);
+  }, [user, profile, authLoading, navigate]);
+
+  useEffect(() => {
+    if (user && profile?.role === 'photographer') {
+      fetchShoots();
+
+      // Subscribe to realtime updates
+      const channel = supabase
+        .channel('photographer-shoots')
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'shoots',
+            filter: `photographer_id=eq.${user.id}`
+          },
+          () => {
+            fetchShoots();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user, profile]);
 
   const fetchShoots = async () => {
     if (!user) return;
@@ -37,6 +70,18 @@ export default function PhotographerDashboard() {
     }
     setLoading(false);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user || !profile || profile.role !== 'photographer') {
+    return null;
+  }
 
   const pendingShoots = shoots.filter((s) =>
     ['Assigned', 'Accepted', 'Reached', 'Started'].includes(s.status)
@@ -113,7 +158,7 @@ export default function PhotographerDashboard() {
                 )}
 
                 {completedShoots.length > 0 && (
-                  <section>
+                  <section className="mt-8">
                     <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-status-completed" />
                       Completed ({completedShoots.length})
@@ -138,7 +183,7 @@ export default function PhotographerDashboard() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border">
         <div className="grid grid-cols-2 h-16">
           <button
             onClick={() => setActiveView('shoots')}

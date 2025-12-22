@@ -9,8 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { CalendarPlus, MapPin, Building2, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
+import { sendSMS, smsTemplates } from '@/lib/sms';
 
-export function CreateShootForm() {
+interface CreateShootFormProps {
+  onShootCreated?: () => void;
+}
+
+export function CreateShootForm({ onShootCreated }: CreateShootFormProps) {
   const [loading, setLoading] = useState(false);
   const [photographers, setPhotographers] = useState<Profile[]>([]);
   const [availablePhotographers, setAvailablePhotographers] = useState<Profile[]>([]);
@@ -34,7 +39,7 @@ export function CreateShootForm() {
     } else {
       setAvailablePhotographers([]);
     }
-  }, [form.date]);
+  }, [form.date, photographers]);
 
   const fetchPhotographers = async () => {
     const { data, error } = await supabase
@@ -69,13 +74,13 @@ export function CreateShootForm() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.from('shoots').insert({
+    const { data, error } = await supabase.from('shoots').insert({
       merchant_name: form.merchantName,
       location: form.location,
       shoot_date: form.date,
       shoot_time: form.time,
       photographer_id: form.photographerId || null,
-    });
+    }).select().single();
 
     if (error) {
       toast({
@@ -88,6 +93,19 @@ export function CreateShootForm() {
         title: 'Shoot Created!',
         description: `Shoot scheduled for ${format(new Date(form.date), 'MMMM d, yyyy')}`,
       });
+
+      // Send SMS notification if photographer is assigned
+      if (form.photographerId) {
+        const photographer = photographers.find(p => p.id === form.photographerId);
+        if (photographer?.phone) {
+          const message = smsTemplates.shootAssigned(
+            form.location,
+            format(new Date(form.date), 'MMMM d, yyyy')
+          );
+          await sendSMS(photographer.phone, message, 'shoot_assigned');
+        }
+      }
+
       setForm({
         merchantName: '',
         location: '',
@@ -95,6 +113,8 @@ export function CreateShootForm() {
         time: '',
         photographerId: '',
       });
+
+      onShootCreated?.();
     }
 
     setLoading(false);

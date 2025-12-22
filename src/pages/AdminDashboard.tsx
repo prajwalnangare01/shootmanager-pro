@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { ShootsTable } from '@/components/admin/ShootsTable';
 import { CreateShootForm } from '@/components/admin/CreateShootForm';
 import { InvoiceView } from '@/components/admin/InvoiceView';
 import { Card, CardContent } from '@/components/ui/card';
-import { Camera, Users, CheckCircle2, Clock } from 'lucide-react';
+import { Camera, Users, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 
 interface Stats {
   totalShoots: number;
@@ -15,6 +17,8 @@ interface Stats {
 }
 
 export default function AdminDashboard() {
+  const { user, profile, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState('dashboard');
   const [stats, setStats] = useState<Stats>({
     totalShoots: 0,
@@ -24,8 +28,20 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    if (!authLoading) {
+      if (!user) {
+        navigate('/auth');
+      } else if (profile && profile.role !== 'admin') {
+        navigate('/photographer');
+      }
+    }
+  }, [user, profile, authLoading, navigate]);
+
+  useEffect(() => {
+    if (user && profile?.role === 'admin') {
+      fetchStats();
+    }
+  }, [user, profile]);
 
   const fetchStats = async () => {
     const [shootsResult, photographersResult] = await Promise.all([
@@ -50,6 +66,18 @@ export default function AdminDashboard() {
       });
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user || !profile || profile.role !== 'admin') {
+    return null;
+  }
 
   const statCards = [
     {
@@ -127,7 +155,7 @@ export default function AdminDashboard() {
                   Schedule a new restaurant photoshoot
                 </p>
               </div>
-              <CreateShootForm />
+              <CreateShootForm onShootCreated={fetchStats} />
             </div>
           )}
 

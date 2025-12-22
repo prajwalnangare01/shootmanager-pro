@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { MapPin, Calendar, Clock, Check, Navigation, Play, Camera, Link, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { sendSMS, smsTemplates } from '@/lib/sms';
 
 interface ShootCardProps {
   shoot: Shoot;
@@ -27,6 +28,7 @@ export function ShootCard({ shoot, onUpdate }: ShootCardProps) {
   const [qcLink, setQcLink] = useState(shoot.qc_link || '');
   const [rawLink, setRawLink] = useState(shoot.raw_link || '');
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const currentStatusIndex = statusFlow.findIndex((s) => s.status === shoot.status);
   const nextStatus = statusFlow[currentStatusIndex + 1];
@@ -50,6 +52,14 @@ export function ShootCard({ shoot, onUpdate }: ShootCardProps) {
         title: 'Status Updated',
         description: `Shoot marked as ${newStatus}`,
       });
+
+      // Send SMS notification when photographer reaches location
+      if (newStatus === 'Reached' && profile) {
+        const message = smsTemplates.photographerReached(shoot.merchant_name, profile.name);
+        // In production, this would go to admin's phone
+        console.log('SMS would be sent to admin:', message);
+      }
+
       onUpdate();
     }
 
@@ -88,6 +98,13 @@ export function ShootCard({ shoot, onUpdate }: ShootCardProps) {
         title: 'Links Uploaded',
         description: 'Your deliverables have been submitted.',
       });
+
+      // Send SMS notification when QC is uploaded
+      if (qcLink) {
+        const message = smsTemplates.qcUploaded(shoot.merchant_name, qcLink);
+        console.log('SMS would be sent to admin:', message);
+      }
+
       onUpdate();
     }
 
@@ -214,15 +231,13 @@ export function ShootCard({ shoot, onUpdate }: ShootCardProps) {
         <div className="flex items-center gap-1 pt-2">
           {statusFlow.map((step, index) => {
             const isCompleted = currentStatusIndex >= index;
-            const isCurrent = currentStatusIndex === index - 1;
 
             return (
               <div
                 key={step.status}
-                className={cn(
-                  'flex-1 h-1.5 rounded-full transition-colors',
+                className={`flex-1 h-1.5 rounded-full transition-colors ${
                   isCompleted ? 'bg-status-completed' : 'bg-muted'
-                )}
+                }`}
               />
             );
           })}
