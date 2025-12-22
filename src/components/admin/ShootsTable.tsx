@@ -1,18 +1,38 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Shoot, Profile } from '@/types/database';
+import { Shoot, Profile, ShootStatus } from '@/types/database';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MapPin, Calendar, Clock, User, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MapPin, Calendar, Clock, Loader2, CheckCircle2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export function ShootsTable() {
   const [shoots, setShoots] = useState<(Shoot & { photographer: Profile | null })[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchShoots();
+
+    // Subscribe to realtime updates
+    const channel = supabase
+      .channel('shoots-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shoots' },
+        () => {
+          fetchShoots();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchShoots = async () => {
@@ -30,6 +50,27 @@ export function ShootsTable() {
       setShoots(data as (Shoot & { photographer: Profile | null })[]);
     }
     setLoading(false);
+  };
+
+  const approveShoot = async (shootId: string) => {
+    const { error } = await supabase
+      .from('shoots')
+      .update({ status: 'Approved' as ShootStatus })
+      .eq('id', shootId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to approve shoot.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Approved!',
+        description: 'Shoot has been approved.',
+      });
+      fetchShoots();
+    }
   };
 
   if (loading) {
@@ -61,12 +102,13 @@ export function ShootsTable() {
                 <TableHead>Photographer</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Links</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {shoots.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                     No shoots scheduled yet. Create your first shoot!
                   </TableCell>
                 </TableRow>
@@ -133,6 +175,19 @@ export function ShootsTable() {
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {shoot.status === 'QC_Uploaded' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => approveShoot(shoot.id)}
+                          className="text-status-completed border-status-completed hover:bg-status-completed hover:text-status-completed-foreground"
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Approve
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
