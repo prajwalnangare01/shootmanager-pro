@@ -6,10 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, User, Shield } from 'lucide-react';
-import { UserRole } from '@/types/database';
+import { Camera } from 'lucide-react';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -22,7 +20,6 @@ const signupSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
   phone: z.string().optional(),
-  role: z.enum(['admin', 'photographer']),
 });
 
 export default function Auth() {
@@ -37,7 +34,6 @@ export default function Auth() {
     password: '',
     name: '',
     phone: '',
-    role: 'photographer' as UserRole,
   });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -99,7 +95,6 @@ export default function Auth() {
       signupForm.email,
       signupForm.password,
       signupForm.name,
-      signupForm.role,
       signupForm.phone || undefined
     );
 
@@ -181,7 +176,7 @@ export default function Auth() {
             <TabsContent value="signup" className="m-0">
               <CardHeader className="pt-0">
                 <CardTitle>Create Account</CardTitle>
-                <CardDescription>Join as an admin or photographer</CardDescription>
+                <CardDescription>Sign up as a photographer</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSignup} className="space-y-4">
@@ -216,31 +211,6 @@ export default function Auth() {
                       value={signupForm.phone}
                       onChange={(e) => setSignupForm({ ...signupForm, phone: e.target.value })}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-role">Role</Label>
-                    <Select
-                      value={signupForm.role}
-                      onValueChange={(value: UserRole) => setSignupForm({ ...signupForm, role: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="photographer">
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            Photographer
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="admin">
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4" />
-                            Admin
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
