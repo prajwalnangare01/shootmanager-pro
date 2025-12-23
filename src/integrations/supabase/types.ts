@@ -76,6 +76,7 @@ export type Database = {
           id: string
           location: string
           merchant_name: string
+          payout: number | null
           photographer_id: string | null
           qc_link: string | null
           raw_link: string | null
@@ -89,6 +90,7 @@ export type Database = {
           id?: string
           location: string
           merchant_name: string
+          payout?: number | null
           photographer_id?: string | null
           qc_link?: string | null
           raw_link?: string | null
@@ -102,6 +104,7 @@ export type Database = {
           id?: string
           location?: string
           merchant_name?: string
+          payout?: number | null
           photographer_id?: string | null
           qc_link?: string | null
           raw_link?: string | null
