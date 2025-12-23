@@ -35,6 +35,7 @@ export interface Shoot {
   status: ShootStatus;
   qc_link: string | null;
   raw_link: string | null;
+  payout: number | null;
   created_at: string;
   updated_at: string;
   photographer?: Profile;

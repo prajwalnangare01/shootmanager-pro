@@ -7,12 +7,19 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Calendar, Clock, Loader2, CheckCircle2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { MapPin, Calendar, Clock, Loader2, CheckCircle2, IndianRupee } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function ShootsTable() {
   const [shoots, setShoots] = useState<(Shoot & { photographer: Profile | null })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [selectedShoot, setSelectedShoot] = useState<Shoot | null>(null);
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [approving, setApproving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -52,11 +59,33 @@ export function ShootsTable() {
     setLoading(false);
   };
 
-  const approveShoot = async (shootId: string) => {
+  const openApproveDialog = (shoot: Shoot) => {
+    setSelectedShoot(shoot);
+    setPayoutAmount('');
+    setApproveDialogOpen(true);
+  };
+
+  const approveShoot = async () => {
+    if (!selectedShoot || !payoutAmount) return;
+    
+    const payout = parseFloat(payoutAmount);
+    if (isNaN(payout) || payout <= 0) {
+      toast({
+        title: 'Invalid Amount',
+        description: 'Please enter a valid payout amount.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setApproving(true);
     const { error } = await supabase
       .from('shoots')
-      .update({ status: 'Approved' as ShootStatus })
-      .eq('id', shootId);
+      .update({ 
+        status: 'Approved' as ShootStatus,
+        payout: payout
+      })
+      .eq('id', selectedShoot.id);
 
     if (error) {
       toast({
@@ -67,10 +96,12 @@ export function ShootsTable() {
     } else {
       toast({
         title: 'Approved!',
-        description: 'Shoot has been approved.',
+        description: `Shoot approved with ₹${payout.toLocaleString('en-IN')} payout.`,
       });
+      setApproveDialogOpen(false);
       fetchShoots();
     }
+    setApproving(false);
   };
 
   if (loading) {
@@ -84,6 +115,7 @@ export function ShootsTable() {
   }
 
   return (
+    <>
     <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -181,7 +213,7 @@ export function ShootsTable() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => approveShoot(shoot.id)}
+                          onClick={() => openApproveDialog(shoot)}
                           className="text-status-completed border-status-completed hover:bg-status-completed hover:text-status-completed-foreground"
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -197,5 +229,72 @@ export function ShootsTable() {
         </div>
       </CardContent>
     </Card>
+
+    <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-status-completed" />
+            Approve Shoot
+          </DialogTitle>
+          <DialogDescription>
+            Enter the payout amount for this shoot before approving.
+          </DialogDescription>
+        </DialogHeader>
+        {selectedShoot && (
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg bg-muted/50 p-4 space-y-2">
+              <p className="text-sm">
+                <span className="text-muted-foreground">Merchant:</span>{' '}
+                <span className="font-medium">{selectedShoot.merchant_name}</span>
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Date:</span>{' '}
+                <span className="font-medium">{format(new Date(selectedShoot.shoot_date), 'MMM d, yyyy')}</span>
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payout">Payout Amount (₹)</Label>
+              <div className="relative">
+                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="payout"
+                  type="number"
+                  placeholder="500"
+                  value={payoutAmount}
+                  onChange={(e) => setPayoutAmount(e.target.value)}
+                  className="pl-9"
+                  min="0"
+                  step="1"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setApproveDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={approveShoot} 
+            disabled={!payoutAmount || approving}
+            className="bg-status-completed hover:bg-status-completed/90"
+          >
+            {approving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Approving...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Approve
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }

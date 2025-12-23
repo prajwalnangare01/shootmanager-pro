@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Receipt, Calendar, User, IndianRupee } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 
-const RATE_PER_SHOOT = 500; // ₹500 per completed shoot
 
 export function InvoiceView() {
   const [shoots, setShoots] = useState<(Shoot & { photographer: Profile | null })[]>([]);
@@ -53,12 +52,14 @@ export function InvoiceView() {
         photographer: shoot.photographer,
         shootCount: 0,
         totalPayout: 0,
+        shoots: [],
       };
     }
     acc[id].shootCount++;
-    acc[id].totalPayout = acc[id].shootCount * RATE_PER_SHOOT;
+    acc[id].totalPayout += shoot.payout || 0;
+    acc[id].shoots.push(shoot);
     return acc;
-  }, {} as Record<string, { photographer: Profile; shootCount: number; totalPayout: number }>);
+  }, {} as Record<string, { photographer: Profile; shootCount: number; totalPayout: number; shoots: Shoot[] }>);
 
   const stats = Object.values(photographerStats);
   const totalPayout = stats.reduce((sum, s) => sum + s.totalPayout, 0);
@@ -117,7 +118,6 @@ export function InvoiceView() {
                     <TableRow className="bg-muted/50">
                       <TableHead>Photographer</TableHead>
                       <TableHead className="text-center">Completed Shoots</TableHead>
-                      <TableHead className="text-center">Rate per Shoot</TableHead>
                       <TableHead className="text-right">Total Payout</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -138,9 +138,6 @@ export function InvoiceView() {
                           </div>
                         </TableCell>
                         <TableCell className="text-center font-medium">{shootCount}</TableCell>
-                        <TableCell className="text-center text-muted-foreground">
-                          ₹{RATE_PER_SHOOT}
-                        </TableCell>
                         <TableCell className="text-right">
                           <span className="inline-flex items-center gap-1 font-semibold text-status-completed">
                             <IndianRupee className="h-4 w-4" />
